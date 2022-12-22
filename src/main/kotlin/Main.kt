@@ -9,6 +9,11 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.Subcommand
 import kotlinx.coroutines.runBlocking
+import io.ktor.server.routing.*
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.response.*
+import io.ktor.server.request.*
 
 val issuerAgent = "http://localhost:8080/prism-agent"
 val holderAgent = "http://localhost:8090/prism-agent"
