@@ -8,6 +8,8 @@ import io.ktor.server.routing.*
 fun Application.configureRouting() {
     routing {
         authenticate("auth-bearer") {
+            invitation()
+            workflow()
             customerRouting()
         }
     }

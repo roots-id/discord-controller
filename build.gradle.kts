@@ -6,6 +6,7 @@ val logback_version: String by project
 plugins {
     kotlin("jvm") version "1.6.21"
     id("io.ktor.plugin") version "2.2.1"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.6.21"
     application
 }
 
@@ -29,11 +30,13 @@ repositories {
 }
 
 dependencies {
-    implementation("io.iohk.atala.prism:prism-enterprise-jvm:0.3.0")
+    implementation("io.iohk.atala.prism:prism-enterprise-jvm:0.4.0")
+
     implementation("org.slf4j:slf4j-simple:1.7.30")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8")
     implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3.5")
+
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor_version")

@@ -9,22 +9,14 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.Subcommand
 import kotlinx.coroutines.runBlocking
-import io.ktor.server.routing.*
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.response.*
-import io.ktor.server.request.*
+import utils.*
 
-val issuerAgent = "http://localhost:8080/prism-agent"
-val holderAgent = "http://localhost:8090/prism-agent"
-val verifierAgent = "http://localhost:9000/prism-agent"
+val holderCC = ConnectClientJVM(Constants.HOLDER_AGENT)
+val holderIC = IssueClientJVM(Constants.HOLDER_AGENT)
 
-val holderCC = ConnectClientJVM(holderAgent)
-val holderIC = IssueClientJVM(holderAgent)
-
-val issuerCC = ConnectClientJVM(issuerAgent)
-val issuerIC = IssueClientJVM(issuerAgent)
-val issuerMC = ManageClientJVM(issuerAgent)
+val issuerCC = ConnectClientJVM(Constants.ISSUER_AGENT)
+val issuerIC = IssueClientJVM(Constants.ISSUER_AGENT)
+val issuerMC = ManageClientJVM(Constants.ISSUER_AGENT)
 
 class CreateSchema : Subcommand("schema", "Create a schema") {
     override fun execute() {
@@ -103,63 +95,4 @@ fun main(args: Array<String>) {
     val parser = ArgParser("discord-controller")
     parser.subcommands(CreateSchema(), CreateConnection(), IssueCredential())
     parser.parse(args)
-}
-
-fun printConnections(client: ConnectClientJVM) {
-    runBlocking {
-        for (connection in client.getConnections().contents) {
-            println("\nConnectionId: ${connection.connectionId}")
-            println("MyDID:        ${connection.myDid}")
-            println("TheirDID:     ${connection.theirDid}")
-            println("Label:        ${connection.label}")
-            println("State:        ${connection.state}")
-            println("created:      ${connection.createdAt}")
-            println("updated:      ${connection.updatedAt}")
-            println("kind:         ${connection.kind}")
-            println("self:         ${connection.self}")
-        }
-    }
-}
-
-// Function to split a string after the first occurrence of "="
-fun String.substringAfter(delimiter: String): String {
-    val index = indexOf(delimiter)
-    return if (index == -1) this else substring(index + delimiter.length)
-}
-
-private fun waitForConnection(connectClient: ConnectClientJVM, connectionId: String) {
-    var connection = runBlocking { connectClient.getConnectionById(connectionId) }
-
-    while (connection.theirDid.isNullOrEmpty()) {
-        println("Waiting for connection: $connectionId\n state:${connection.state}")
-        Thread.sleep(1000)
-        connection = runBlocking { connectClient.getConnectionById(connectionId) }
-    }
-    println("Connected: $connectionId\n state:${connection.state}")
-}
-
-private fun waitForCredentialOffer(issueClient: IssueClientJVM) {
-    var wait = true
-    while (wait) {
-        println("Waiting for credential offers")
-        for (offer in runBlocking { issueClient.getCredentialRecords().items }) {
-            if (offer.role == "Holder" && offer.protocolState == "OfferReceived") {
-                wait = false
-                return
-            }
-        }
-        Thread.sleep(1000)
-    }
-}
-
-private fun acceptAllOffers(issueClient: IssueClientJVM) {
-    println("--> Accept all offers...")
-    runBlocking {
-        for (offer in issueClient.getCredentialRecords().items) {
-            println("\nOfferId: ${offer.recordId} state: ${offer.protocolState}")
-            if (offer.role == "Holder" && offer.protocolState == "OfferReceived") {
-                issueClient.acceptOffer(offer.recordId)
-            }
-        }
-    }
 }
