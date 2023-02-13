@@ -1,3 +1,3 @@
 
-rootProject.name = "discord-controller"
+rootProject.name = "discord-credential-controller"
 
