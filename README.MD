@@ -6,6 +6,7 @@ The purpose of the project is to demonstrate how decentralized identity can be u
 
 Please note that this verifiable credential does not have any practical utility at this time. It is simply an example of how decentralized identity can be used in practice. However, we hope that by showcasing the capabilities of decentralized identity, we can encourage more widespread adoption of this technology and its potential applications.
 
+The credential format provided is a W3C JWT formatted credential.
 
 ## Environment variables
 
