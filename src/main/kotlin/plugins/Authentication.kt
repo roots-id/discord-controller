@@ -8,7 +8,7 @@ fun Application.configureAuthentication() {
         bearer("auth-bearer") {
             realm = "Access to the '/' path"
             authenticate { tokenCredential ->
-                if (tokenCredential.token == "abc123") {
+                if (tokenCredential.token == "12345") {
                     UserIdPrincipal("RootsID")
                 } else {
                     null

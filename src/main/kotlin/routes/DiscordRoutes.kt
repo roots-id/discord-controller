@@ -1,14 +1,23 @@
 package routes
 
 import controller.createInvitation
+import controller.createPrismDid
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import models.*
 import org.openapitools.client.apis.ConnectionsManagementApi
+import org.openapitools.client.apis.DIDRegistrarApi
 import org.openapitools.client.apis.IssueCredentialsProtocolApi
 import org.openapitools.client.models.Connection.State
 import org.openapitools.client.models.CreateIssueCredentialRecordRequest
@@ -22,15 +31,24 @@ val url = System.getenv(Constants.ISSUER_URL) ?: Constants.ISSUER_URL_DEFAULT
 val client = createHttpClient(key)
 val connectionApi = ConnectionsManagementApi(url, client)
 val issueCredentialApi = IssueCredentialsProtocolApi(url, client)
-
+val didRegistrarApi = DIDRegistrarApi(url, client)
 var pollingJob: Job? = null
+
+// TODO: this is the "database"
+val taskStorage = mutableListOf<Task>()
+var issuingDid: String? = null
 
 fun Route.invitation() {
     post("/invitation") {
         println("Received invitation request")
         val discordUser = call.receive<DiscordUser>()
         val connection = createInvitation(connectionApi, discordUser)
-        val task = Task(UUID.randomUUID().toString(), discordUser, connection.connectionId.toString())
+        val task = Task(
+            UUID.randomUUID().toString(),
+            discordUser,
+            connection.connectionId.toString(),
+            connection.invitation.invitationUrl
+        )
         taskStorage.add(task)
         print(task)
         call.respond(connection)
@@ -38,17 +56,38 @@ fun Route.invitation() {
 }
 
 fun Route.task() {
-    get("/task") {
-        if (taskStorage.isNotEmpty()) {
-            call.respond(taskStorage)
-        } else {
-            call.respondText("No tasks found", status = HttpStatusCode.OK)
+    post("/task") {
+        call.respond(taskStorage)
+    }
+}
+
+suspend fun agentInfo(): String {
+    val client = HttpClient()
+    val response: HttpResponse = client.get("$url/_system/health") {
+        header("apiKey", key)
+    }
+    println("Response status: ${response.status}")
+    val responseBody = response.bodyAsText()
+    val version = Json.parseToJsonElement(responseBody).jsonObject["version"]!!.jsonPrimitive.content
+    client.close()
+    return version
+}
+fun Route.info() {
+    post("/info") {
+        call.respond("Connected to PRISM Agent v${agentInfo()} at $url")
+    }
+}
+
+fun Route.issuingDid() {
+    post("/create_issuing_did") {
+        if (issuingDid == null) {
+            issuingDid = createPrismDid(didRegistrarApi)
         }
+        call.respond("Issuing did: $issuingDid")
     }
 }
 
 fun issueCredential(task: Task) {
-    val connection = connectionApi.getConnection(task.connectionId)
     // Issuer creates a credential offer
     val claims = mutableMapOf<String, String>()
     claims.put("identifier", task.discordUser.identifier)
@@ -56,17 +95,18 @@ fun issueCredential(task: Task) {
     claims.put("discriminator", task.discordUser.discriminator)
     claims.put("user", task.discordUser.user)
     claims.put("created_at", task.discordUser.created_at)
+    claims.put("email", task.discordUser.email ?: "")
 
     val credentialOfferRequest =
         CreateIssueCredentialRecordRequest(
-            subjectId = connection.theirDid!!,
+            issuingDID = issuingDid!!,
+            connectionId = task.connectionId,
             claims = claims,
-            automaticIssuance = true,
-            awaitConfirmation = false
+            automaticIssuance = true
         )
     try {
         val credentialOffer = runBlocking { issueCredentialApi.createCredentialOffer(credentialOfferRequest) }
-        task.credentialRecordId = credentialOffer.recordId
+        task.credentialRecordId = UUID.fromString(credentialOffer.recordId)
         task.state = TaskState.CREDENTIAL_OFFER_SENT
         println("--> Credential record id: ${credentialOffer.recordId}")
     } catch (e: Throwable) {
@@ -150,44 +190,3 @@ fun Route.polling() {
         }
     }
 }
-
-// fun Route.customerRouting() {
-//    route("/customer") {
-//        get {
-//            if (discordUserStorage.isNotEmpty()) {
-//                call.respond(discordUserStorage)
-//            } else {
-//                call.respondText("No users found", status = HttpStatusCode.OK)
-//            }
-//        }
-//        get("{id?}") {
-//            val id = call.parameters["id"] ?: return@get call.respondText(
-//                "Missing id",
-//                status = HttpStatusCode.BadRequest
-//            )
-//            val customer =
-//                discordUserStorage.find { it.identifier == id } ?: return@get call.respondText(
-//                    "No user with id $id",
-//                    status = HttpStatusCode.NotFound
-//                )
-//            call.respond(customer)
-//        }
-//        post {
-//            try {
-//                val customer = call.receive<Customer>()
-//                customerStorage.add(customer)
-//                call.respondText("User stored correctly", status = HttpStatusCode.Created)
-//            } catch (e: Exception) {
-//                call.respondText("Error: ${e.cause?.message}", status = HttpStatusCode.BadRequest)
-//            }
-//        }
-//        delete("{id?}") {
-//            val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest)
-//            if (discordUserStorage.removeIf { it.identifier == id }) {
-//                call.respondText("User removed correctly", status = HttpStatusCode.Accepted)
-//            } else {
-//                call.respondText("Not Found", status = HttpStatusCode.NotFound)
-//            }
-//        }
-//    }
-// }

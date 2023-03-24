@@ -4,11 +4,9 @@ import kotlinx.coroutines.runBlocking
 import models.DiscordUser
 import models.Task
 import org.openapitools.client.apis.ConnectionsManagementApi
+import org.openapitools.client.apis.DIDRegistrarApi
 import org.openapitools.client.apis.IssueCredentialsProtocolApi
-import org.openapitools.client.apis.SchemaRegistryApi
 import org.openapitools.client.models.*
-import java.time.OffsetDateTime
-import java.util.*
 
 fun printConnections(connectionApi: ConnectionsManagementApi) {
     runBlocking {
@@ -44,14 +42,12 @@ fun waitForConnection(connectionApi: ConnectionsManagementApi, connectionId: Str
 }
 
 fun waitForCredentialOffer(issueApi: IssueCredentialsProtocolApi) {
-    var wait = true
-    while (wait) {
+    while (true) {
         println("Waiting for credential offers")
-        for (offer in runBlocking { issueApi.getCredentialRecords().items }) {
+        for (offer in runBlocking { issueApi.getCredentialRecords().contents }) {
             if (offer.role == IssueCredentialRecord.Role.holder &&
                 offer.protocolState == IssueCredentialRecord.ProtocolState.offerReceived
             ) {
-                wait = false
                 return
             }
         }
@@ -59,39 +55,51 @@ fun waitForCredentialOffer(issueApi: IssueCredentialsProtocolApi) {
     }
 }
 
-fun acceptAllOffers(issueApi: IssueCredentialsProtocolApi) {
-    println("--> Accept all offers...")
-    runBlocking {
-        for (offer in issueApi.getCredentialRecords().items) {
-            println("\nOfferId: ${offer.recordId} state: ${offer.protocolState}")
-            if (offer.role == IssueCredentialRecord.Role.holder &&
-                offer.protocolState == IssueCredentialRecord.ProtocolState.offerReceived
-            ) {
-                issueApi.acceptCredentialOffer(offer.recordId)
-            }
-        }
-    }
-}
+// fun acceptAllOffers(issueApi: IssueCredentialsProtocolApi) {
+//    println("--> Accept all offers...")
+//    runBlocking {
+//        for (offer in issueApi.getCredentialRecords().contents) {
+//            println("\nOfferId: ${offer.recordId} state: ${offer.protocolState}")
+//            if (offer.role == IssueCredentialRecord.Role.holder &&
+//                offer.protocolState == IssueCredentialRecord.ProtocolState.offerReceived
+//            ) {
+//                issueApi.acceptCredentialOffer(offer.recordId)
+//            }
+//        }
+//    }
+// }
 
-fun registerDiscordSchema(schemaApi: SchemaRegistryApi) {
-    val schema = VerificationCredentialSchemaInput(
-        "discord",
-        "1.0",
-        UUID.randomUUID(),
-        "Discord user schema",
-        listOf("identifier", "name", "discriminator", "user", "created_at"),
-        OffsetDateTime.now()
-    )
-    val response = runBlocking {
-        schemaApi.createSchema(schema)
-    }
-}
+// fun registerDiscordSchema(schemaApi: SchemaRegistryApi) {
+//    val schema = VerificationCredentialSchemaInput(
+//        "discord",
+//        "1.0",
+//        UUID.randomUUID(),
+//        "Discord user schema",
+//        listOf("identifier", "name", "discriminator", "user", "created_at"),
+//        OffsetDateTime.now()
+//    )
+//    val response = runBlocking {
+//        schemaApi.createSchema(schema)
+//    }
+// }
 
 fun createInvitation(connectionApi: ConnectionsManagementApi, discordUser: DiscordUser): Connection {
     val request = CreateConnectionRequest(discordUser.user)
     val connection = runBlocking { connectionApi.createConnection(request) }
     println("--> Issuer connection: ${connection.connectionId}")
     return connection
+}
+
+fun createPrismDid(didRegistrarApi: DIDRegistrarApi): String {
+    val keysTemplate = listOf<ManagedDIDKeyTemplate>(
+        ManagedDIDKeyTemplate("key1", ManagedDIDKeyTemplate.Purpose.assertionMethod),
+        ManagedDIDKeyTemplate("key2", ManagedDIDKeyTemplate.Purpose.authentication)
+    )
+    val services = listOf<Service>()
+    val docTemplate = CreateManagedDidRequestDocumentTemplate(keysTemplate, services)
+    val managedDidRequest = CreateManagedDidRequest(docTemplate)
+    val did = runBlocking { didRegistrarApi.createManagedDid(managedDidRequest) }
+    return did.longFormDid
 }
 
 fun issueCredential(issueApi: IssueCredentialsProtocolApi, task: Task): IssueCredentialRecord {
@@ -103,12 +111,10 @@ fun issueCredential(issueApi: IssueCredentialsProtocolApi, task: Task): IssueCre
     claims.put("created_at", task.discordUser.created_at)
 
     val request = CreateIssueCredentialRecordRequest(
-        task.theirDid!!,
         claims,
-        null,
-        null,
-        automaticIssuance = true,
-        awaitConfirmation = false
+        task.theirDid!!,
+        task.connectionId,
+        automaticIssuance = true
     )
     val credentialRecord = runBlocking { issueApi.createCredentialOffer(request) }
     println("--> Issued credential: ${credentialRecord.recordId}")

@@ -8,8 +8,7 @@ data class DiscordUser(
     val name: String,
     val discriminator: String,
     val user: String,
-    val created_at: String
+    val created_at: String,
+    val email: String? = null
 )
 
-// TODO: this is the "database"
-val discordUserStorage = mutableListOf<DiscordUser>()

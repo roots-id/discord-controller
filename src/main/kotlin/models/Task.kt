@@ -8,12 +8,12 @@ data class Task(
     val taskId: String,
     val discordUser: DiscordUser,
     val connectionId: String,
+    var invitation: String? = null,
     @Contextual
     var credentialRecordId: UUID? = null,
     var state: String = TaskState.INVITATION_GENERATED,
     var theirDid: String? = null,
     var jwtCredential: String? = null
-
 )
 
 object TaskState {
@@ -24,11 +24,6 @@ object TaskState {
     const val CONNECTION_STABLISHED = "ConnectionStablished"
     const val CREDENTIAL_OFFER_SENT = "CredentialOfferSent"
     const val CREDENTIAL_ISSUED = "CredentialIssued"
-
-//    const val CONNECTION_STABLISHED = "ConnectionResponseSent"
-//    const val CREDENTIAL_OFFER_SENT = "OfferSent"
-//    const val CREDENTIAL_ISSUED = "CredentialSent"
 }
 
-// TODO: this is the "database"
-val taskStorage = mutableListOf<Task>()
+

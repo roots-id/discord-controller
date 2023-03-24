@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <style>
+        .console-log {
+            background-color: #000;
+            color: #fff;
+            padding: 10px;
+            overflow-y: scroll;
+            height: 200px;
+            max-height: 200px;
+            word-wrap: break-word;
+            word-break: break-all;
+        }
+        #task-table {
+          width: 100%;
+          table-layout: fixed;
+        }
+
+        #task-table th:nth-child(1) {
+          width: 20%;
+        }
+
+        #task-table th:nth-child(2) {
+          width: 10%;
+        }
+
+        #task-table th:nth-child(3) {
+          width: 25%;
+        }
+
+        #task-table th:nth-child(4) {
+          width: 30%;
+        }
+
+        #task-table th:nth-child(5) {
+          width: 15%;
+        }
+        #task-table td {
+          word-wrap: break-word;
+          word-break: break-all;
+
+        }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-center mt-5">Controller Dashboard</h1>
+    <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+        <button class="btn btn-primary" id="start">Start</button>
+        <button class="btn btn-warning" id="stop">Stop</button>
+    </div>
+    <h2 class="text-left">Log:</h2>
+    <div class="console-log mt-4" id="console-log"></div>
+    <table class="table table-striped mt-4" id="task-table">
+        <thead>
+        <tr>
+            <th scope="col">Task ID</th>
+            <th scope="col">User</th>
+            <th scope="col">Connection ID</th>
+            <th scope="col">Invitation</th>
+            <th scope="col">State</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    const startBtn = document.querySelector('#start');
+    const stopBtn = document.querySelector('#stop');
+    const consoleLog = document.querySelector('#console-log');
+    const taskTable = document.querySelector('#task-table tbody');
+
+
+    const appendConsoleLog = (text) => {
+      const currentTime = new Date().toLocaleTimeString();
+      const p = document.createElement('p');
+      p.textContent = `[${currentTime}] ${text}`;
+      consoleLog.appendChild(p);
+      consoleLog.scrollTop = consoleLog.scrollHeight;
+    };
+
+
+    const fetchApi = async (url) => {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        return await response.text();
+    };
+
+    const updateTable = (data) => {
+        taskTable.innerHTML = '';
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.taskId}</td>
+                <td>${item.discordUser.user}</td>
+                <td>${item.connectionId}</td>
+                <td>${item.invitation}</td>
+                <td>${item.state}</td>
+            `;
+            taskTable.appendChild(tr);
+        });
+    };
+
+    startBtn.addEventListener('click', async () => {
+        const response = await fetchApi('http://localhost:9010/polling/start/5000');
+        appendConsoleLog(response);
+    });
+
+    stopBtn.addEventListener('click', async () => {
+        const response = await fetchApi('http://localhost:9010/polling/stop');
+        appendConsoleLog(response);
+    });
+
+    async function createDid() {
+        const response = await fetchApi('http://localhost:9010/create_issuing_did');
+        appendConsoleLog(response);
+    }
+
+    async function getInfo() {
+        const response = await fetchApi('http://localhost:9010/info');
+        appendConsoleLog(response);
+    }
+
+    getInfo()
+
+    setInterval(async () => {
+        const response = await fetchApi('http://localhost:9010/task');
+        const data = JSON.parse(response);
+        updateTable(data);
+    }, 3000);
+
+    createDid()
+</script>
+</body>
+</html>
